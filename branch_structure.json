@@ -1,0 +1,24 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "fix/issue-423-test-agents-cover-market-creator-duplicate",
+    "fix/issue-454-test-devx-cover-testnet-funding-helpers-with-a",
+    "main",
+    "origin",
+    "security/issue-447-feat-security-bind-basket-creation-signatures"
+  ],
+  "parent": {
+    "fix/issue-423-test-agents-cover-market-creator-duplicate": "main",
+    "fix/issue-454-test-devx-cover-testnet-funding-helpers-with-a": "main",
+    "main": null,
+    "origin": "main",
+    "security/issue-447-feat-security-bind-basket-creation-signatures": "main"
+  },
+  "order": [
+    "main",
+    "fix/issue-423-test-agents-cover-market-creator-duplicate",
+    "fix/issue-454-test-devx-cover-testnet-funding-helpers-with-a",
+    "origin",
+    "security/issue-447-feat-security-bind-basket-creation-signatures"
+  ]
+}
