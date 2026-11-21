@@ -11,6 +11,16 @@ Both `mimir-market` and `mimir-squad` contracts emit comprehensive lifecycle eve
 - **Safe agent operations**: Observable triggers for oracle workers and indexers
 - **Audit trail**: Complete history for reconciliation and incident response
 
+## Claim Revision
+
+Every market mutation event for a claim carries an explicit `revision` field (u32). The claim revision is a monotonically increasing counter that is incremented only after a successful state change to that claim. A rejected invocation (failed authorization, invalid lifecycle transition, insufficient escrow, etc.) leaves the revision and escrow unchanged.
+
+**Guarantees:**
+- A new claim starts at revision `0` at creation.
+- Each successful mutation (challenge, resolution, cancellation, deadline transition) increments the revision by exactly `1`.
+- Rejected or reverted invocations do not change the stored revision, state, or escrow.
+- Indexers can use `revision` to detect gaps and order events for the same claim without relying on ledger sequence alone.
+
 ## mimir-market Events
 
 ### Core Lifecycle Events
@@ -23,6 +33,7 @@ Emitted on every claim state change. Tracks transitions between `Open`, `Active`
 - `from_state`: Previous state (u32 enum value)
 - `to_state`: New state (u32 enum value)
 - `timestamp`: Ledger timestamp when transition occurred
+- `revision`: Claim revision after this successful transition
 
 **State Values:**
 - 0 = Open
@@ -44,6 +55,7 @@ Emitted when a claim's deadline passes and it becomes eligible for resolution or
 - `deadline`: The deadline timestamp that was reached
 - `challenger_count`: Number of challengers at deadline
 - `total_staked`: Total funds in escrow (creator + all challengers)
+- `revision`: Claim revision after the deadline transition
 
 **Emitted by:**
 - `transition_deadline`: For unchallenged claims entering cancellation
@@ -59,6 +71,7 @@ Emitted when initial escrow is established or topped up for a claim.
 - `funder` (topic): Address providing the escrow
 - `amount`: USDC amount in atomic units (7 decimals)
 - `escrow_type`: String indicating escrow purpose
+- `revision`: Claim revision after the escrow change
 
 **Escrow Types:**
 - `"creator_stake"`: Creator's initial stake at claim creation
@@ -78,6 +91,7 @@ Emitted on fixed-odds liquidity state changes beyond initial reservations.
 - `reserved_liability`: Total creator liability reserved for all challengers
 - `available_liquidity`: Creator stake remaining after reservations
 - `total_creator_stake`: Original creator stake amount
+- `revision`: Claim revision after the liquidity change
 
 **Emitted by:**
 - Future extensions for dynamic liquidity management
@@ -89,7 +103,7 @@ Emitted on fixed-odds liquidity state changes beyond initial reservations.
 
 The following existing events work together with lifecycle events:
 
-- **ClaimCreated**: Initial claim setup, now paired with `EscrowSeeded`
+- **ClaimCreated**: Initial claim setup (revision `0`), now paired with `EscrowSeeded`
 - **ClaimChallenged**: Challenge acceptance, now paired with `EscrowSeeded` and `ClaimStateTransitioned`
 - **ClaimResolved**: Settlement result, now paired with `ClaimStateTransitioned` and `DeadlineReached`
 - **ClaimCancelled**: Cancellation completed, now paired with `ClaimStateTransitioned`
@@ -258,7 +272,7 @@ For the full state diagram, the caller/authority matrix, and the refund rules fo
 2. **Conservation Checks**: Sum `EscrowSeeded` amounts and verify against payouts and remaining escrow
 3. **Deadline Monitoring**: Listen to `DeadlineReached` and `MarketDeadlineReached` to identify claims needing oracle attention
 4. **Pool Analytics**: Track `LiquidityAdded` and `LiquidityRemoved` for TVL, liquidity depth charts, and participation patterns
-5. **Revision Ordering**: Use `market_revision` on mutation events to order and gap-check squad market updates
+5. **Revision Ordering**: Use `market_revision` on squad mutation events, and the claim `revision` field on claim mutation events, to order and gap-check updates
 6. **Fee Recipient Rotation**: Track `FeeRecipientQueued`, `FeeRecipientCancelled`, and `FeeRecipientChanged` to know which address is entitled to accrued fees
 
 ### For Oracle Workers
@@ -288,4 +302,4 @@ Within a single transaction:
 1. **Create**: `EscrowSeeded` → `ClaimCreated` → `FeePolicySnapshotted`
 2. **Challenge**: `EscrowSeeded` → `ClaimStateTransitioned` (if Open → Active) → `FixedOddsLiquidityReserved` (if applicable) → `ClaimChallenged`
 3. **Resolve**: `DeadlineReached` → `ClaimStateTransitioned` (Active → Resolved) → `MarketSettled` → `ClaimResolved` → `VerdictEncoded`
-4
+4. Across transactions, events for the same claim are totally ordered by `revision`; a rejected invocation emits no mutation event and does not advance `revision`.
