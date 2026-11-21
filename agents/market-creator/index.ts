@@ -237,44 +237,6 @@ const CREATOR_ADDR   = CREATOR.address;
 const CREATOR_PAYER  = payingWalletFor(CREATOR);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-function formatUsd(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "unknown";
-  if (value >= 1000) return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (value >= 1) return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
-}
-
-export function extractUsdThresholds(text: string): number[] {
-  const thresholds: number[] = [];
-  const seen = new Set<string>();
-  const patterns = [
-    /\$\s*([0-9][0-9,]*(?:\.[0-9]+)?)(?:\s*([kKmMbBtT]))?/g,
-    /\b([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:USD|US dollars?|dollars?)\b/gi,
-  ];
-
-  for (const pattern of patterns) {
-    for (const match of text.matchAll(pattern)) {
-      const raw = match[1]?.replace(/,/g, "");
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed <= 0) continue;
-      const suffix = match[2]?.toLowerCase();
-      const multiplier = suffix === "k" ? 1_000
-        : suffix === "m" ? 1_000_000
-        : suffix === "b" ? 1_000_000_000
-        : suffix === "t" ? 1_000_000_000_000
-        : 1;
-      const value = parsed * multiplier;
-      const key = value.toString();
-      if (!seen.has(key)) {
-        seen.add(key);
-        thresholds.push(value);
-      }
-    }
-  }
-
-  return thresholds;
-}
-
 export function cryptoThresholdReason(candidate: ClaimCandidate, event: CryptoEvent): string | null {
   if (!Number.isFinite(event.priceUsd) || event.priceUsd <= 0) {
     return `missing live CoinGecko price for ${event.symbol}`;
